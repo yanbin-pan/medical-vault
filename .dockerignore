@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+.git
+vault/
+*.md
+!packages/api/medvault/vault/templates/MANIFEST.md

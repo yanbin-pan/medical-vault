@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://minipi.net/medical-vault/schemas/observation.v1.json",
+  "title": "Medical Vault Observation, version 1",
+  "description": "One measured or asserted fact about a person at a point in time. Stored one JSON object per line (NDJSON) beside the document it came from. This shape is deliberately generic: a blood analyte, an organ dimension, a blood-flow velocity and a yes/no finding are all observations, so adding a new kind of measurement never requires a schema change.",
+  "type": "object",
+  "required": ["schema_version", "observation_id", "document_id", "tenant_id", "subject_id", "effective_time", "label_raw"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": 1},
+    "observation_id": {"type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$", "description": "ULID."},
+    "document_id": {"type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"},
+    "tenant_id": {"type": "string", "minLength": 1},
+    "subject_id": {"type": "string", "minLength": 1},
+
+    "effective_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the fact was true — normally the sample-collection or scan time, not the report time."
+    },
+
+    "label_raw": {
+      "type": "string",
+      "description": "The measurement's name exactly as printed, in the original script (e.g. 右肝斜径, 白细胞计数). THIS FIELD IS THE FOUNDATION OF THE WHOLE DESIGN. Codes and translations are interpretations that may improve later; the printed label is ground truth and is never discarded. Any observation can be re-coded years from now by re-reading this."
+    },
+    "label_en": {"type": ["string", "null"], "description": "English rendering of label_raw."},
+
+    "analyte_code": {
+      "type": ["string", "null"],
+      "description": "Canonical code in `SYSTEM:CODE` form. Prefer a public system so the data outlives this application: LOINC:718-7, SNOMED:271649006. `MV:` is the local namespace for concepts with no public code. `UNMAPPED:<slug>` marks an observation kept verbatim because no mapping existed yet — these are real data, not errors, and are re-mapped automatically whenever the catalog improves.",
+      "examples": ["LOINC:718-7", "MV:liver.right-lobe.oblique-diameter", "UNMAPPED:you-gan-xie-jing"]
+    },
+
+    "value_num": {"type": ["number", "null"], "description": "Numeric value exactly as printed, in `unit`."},
+    "value_text": {"type": ["string", "null"], "description": "For non-numeric results: 阴性 / negative / 未见异常."},
+    "value_bool": {"type": ["boolean", "null"]},
+    "unit_raw": {"type": ["string", "null"], "description": "Unit as printed, e.g. mm, mmol/L, 10^9/L, cm/s."},
+
+    "canonical_value": {
+      "type": ["number", "null"],
+      "description": "value_num converted into canonical_unit. Derived, and recomputed on every reindex — never trusted as input. This is what makes a 2026 result printed in mg/dL comparable with a 2036 result printed in mmol/L."
+    },
+    "canonical_unit": {"type": ["string", "null"], "description": "UCUM code for canonical_value."},
+
+    "comparator": {
+      "type": ["string", "null"],
+      "enum": ["<", "<=", ">", ">=", "~", null],
+      "description": "Set when the printed result was bounded rather than exact, e.g. '<0.01'. Dropping this would turn a detection limit into a false precise reading."
+    },
+
+    "reference_low": {"type": ["number", "null"], "description": "Lower bound of the range printed on THIS report. Ranges are per-lab and change over time, so they are stored per observation, not looked up globally."},
+    "reference_high": {"type": ["number", "null"]},
+    "reference_text": {"type": ["string", "null"], "description": "Used when the range is not a simple interval, e.g. '阴性' or 'negative'."},
+    "abnormal_flag": {
+      "type": ["string", "null"],
+      "enum": ["low", "high", "normal", "abnormal", "critical_low", "critical_high", null],
+      "description": "As flagged by the issuing lab (↑ / ↓ / H / L), not as computed by us. Their flag reflects their range."
+    },
+
+    "body_site": {
+      "type": ["string", "null"],
+      "description": "What was measured, when the analyte alone is ambiguous. Essential for imaging: 'kidney' with laterality 'left' is a different series from the right one.",
+      "examples": ["kidney", "common-carotid-artery", "liver", "gallbladder"]
+    },
+    "laterality": {"type": ["string", "null"], "enum": ["left", "right", "bilateral", null]},
+    "method": {"type": ["string", "null"], "description": "How it was measured, where that changes comparability (assay, ultrasound, CT)."},
+    "specimen": {"type": ["string", "null"], "examples": ["serum", "whole-blood", "urine"]},
+
+    "qualifiers": {
+      "type": "object",
+      "description": "Open key/value bag for anything this schema did not anticipate — fasting state, gestational age, probe frequency, contrast agent. The escape hatch that keeps version 1 usable for measurements nobody has invented yet.",
+      "additionalProperties": true
+    },
+
+    "confidence": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1,
+      "description": "Extractor's confidence in this row. Low-confidence rows are surfaced for review, never silently dropped."
+    },
+    "source_context": {
+      "type": ["string", "null"],
+      "description": "The surrounding printed text the value was read from, kept so a human reviewer can check the reading without re-deciphering the photograph."
+    }
+  }
+}

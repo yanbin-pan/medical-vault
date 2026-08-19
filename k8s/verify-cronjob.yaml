@@ -1,0 +1,46 @@
+# Nightly integrity check.
+#
+# `medvault verify` re-hashes every original against the digest recorded when it
+# was filed. Silent bit-rot on an SSD is the failure mode that a backup cannot
+# save you from, because a corrupted file gets backed up too. Running this on a
+# schedule is the difference between finding out in a week and finding out in
+# five years.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: medical-vault-verify
+  namespace: medical-vault
+spec:
+  schedule: "17 4 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+          containers:
+            - name: verify
+              image: ghcr.io/yanbin-pan/medical-vault:0.1.0
+              # A non-zero exit marks the Job failed, which surfaces in
+              # `kubectl get jobs -A` and in the Prometheus kube-state metrics
+              # the cluster already scrapes.
+              command: [medvault, verify]
+              env:
+                - name: MEDVAULT_VAULT_PATH
+                  value: /data/vault
+              volumeMounts:
+                - name: vault
+                  mountPath: /data/vault
+              resources:
+                requests: {cpu: 50m, memory: 128Mi}
+                limits: {memory: 256Mi}
+          volumes:
+            - name: vault
+              persistentVolumeClaim:
+                claimName: medical-vault-data

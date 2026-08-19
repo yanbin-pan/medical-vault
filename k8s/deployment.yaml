@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: medical-vault
+  namespace: medical-vault
+spec:
+  replicas: 1
+  strategy:
+    # Recreate, and one replica only. The vault PVC is ReadWriteOnce, and two
+    # pods appending to the same document directory over NFS is exactly the
+    # failure this repository is designed to avoid.
+    type: Recreate
+  selector:
+    matchLabels: {app: medical-vault}
+  template:
+    metadata:
+      labels: {app: medical-vault}
+    spec:
+      securityContext:
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      initContainers:
+        # Creates the schema and rebuilds the projection from the vault on every
+        # start. It is idempotent and cheap at this scale, and it means losing
+        # the database PVC is a non-event: delete it, restart, and the pod
+        # repopulates from the files. That property is the whole point of the
+        # design, so it is exercised on every deploy rather than trusted.
+        - name: reindex
+          image: ghcr.io/yanbin-pan/medical-vault:0.1.0
+          command: [sh, -ec]
+          args:
+            - |
+              medvault init-db
+              medvault reindex
+          env: &medvault_env
+            - name: MEDVAULT_VAULT_PATH
+              value: /data/vault
+            - name: MEDVAULT_DATABASE_URL
+              valueFrom:
+                secretKeyRef: {name: medical-vault, key: database-url}
+            - name: MEDVAULT_ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef: {name: medical-vault, key: anthropic-api-key}
+            # Cloudflare Access authenticates every request at the edge and sets
+            # this header itself, stripping any copy the client sent. Trusting it
+            # is only safe because the tunnel is the sole route to this pod —
+            # see docs/operations.md before turning it off.
+            - name: MEDVAULT_TRUST_ACCESS_HEADER
+              value: "true"
+            - name: MEDVAULT_WEB_ROOT
+              value: /app/web
+          volumeMounts: &medvault_mounts
+            - name: vault
+              mountPath: /data/vault
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {memory: 512Mi}
+      containers:
+        - name: api
+          image: ghcr.io/yanbin-pan/medical-vault:0.1.0
+          ports:
+            - containerPort: 8000
+          env: *medvault_env
+          volumeMounts: *medvault_mounts
+          readinessProbe:
+            httpGet: {path: /api/health, port: 8000}
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet: {path: /api/health, port: 8000}
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            # Reading a document holds a downscaled image and the model's reply
+            # in memory. 768Mi is comfortable; below ~512Mi uploads start failing
+            # under Pillow rather than anywhere obvious.
+            limits: {memory: 768Mi}
+      volumes:
+        - name: vault
+          persistentVolumeClaim:
+            claimName: medical-vault-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: medical-vault
+  namespace: medical-vault
+spec:
+  selector: {app: medical-vault}
+  ports:
+    - port: 80
+      targetPort: 8000

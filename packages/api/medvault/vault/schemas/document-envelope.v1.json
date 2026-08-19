@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://minipi.net/medical-vault/schemas/document-envelope.v1.json",
+  "title": "Medical Vault Document Envelope, version 1",
+  "description": "Describes one source document (a photograph or scan of a medical result) and the provenance of everything derived from it. Written once, never mutated. Corrections are recorded as a new envelope whose `supersedes` names the one it replaces.",
+  "type": "object",
+  "required": ["schema_version", "document_id", "tenant_id", "subject_id", "captured_at", "recorded_at", "source"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": 1},
+    "document_id": {
+      "type": "string",
+      "description": "ULID. Lexicographically sortable by creation time, so a plain directory listing is chronological.",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "tenant_id": {"type": "string", "minLength": 1},
+    "subject_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The person the document is about. A tenant may hold records for several people."
+    },
+    "supersedes": {
+      "type": ["string", "null"],
+      "description": "document_id of an envelope this one corrects. The superseded record is never deleted."
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the medical event happened, as printed on the document. This is the clinically meaningful time."
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When this record entered the vault. Distinct from captured_at: a 2019 report may be filed in 2031."
+    },
+    "document_type": {
+      "type": "string",
+      "description": "Free text, not an enum. An enum here would need a code change to file a kind of report nobody has thought of yet. Conventional values: blood_panel, ultrasound, radiology, pathology, prescription, discharge_summary, vaccination, vitals, other.",
+      "examples": ["blood_panel", "ultrasound", "radiology"]
+    },
+    "source": {
+      "type": "object",
+      "required": ["media_type", "sha256", "byte_size", "filename"],
+      "additionalProperties": true,
+      "properties": {
+        "filename": {"type": "string", "description": "Name of the original file as stored beside this envelope."},
+        "media_type": {"type": "string", "examples": ["image/jpeg", "application/pdf"]},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Digest of the original bytes. Lets a future reader prove the image was never altered."},
+        "byte_size": {"type": "integer", "minimum": 0},
+        "page_count": {"type": ["integer", "null"], "minimum": 1}
+      }
+    },
+    "provider": {
+      "type": "object",
+      "description": "Where the test was done. Kept as written, including the original script.",
+      "additionalProperties": true,
+      "properties": {
+        "name_raw": {"type": ["string", "null"], "description": "Verbatim, e.g. 上海电力医院"},
+        "name_en": {"type": ["string", "null"], "description": "Translation, e.g. Shanghai Electric Power Hospital"},
+        "department_raw": {"type": ["string", "null"]},
+        "country": {"type": ["string", "null"], "description": "ISO 3166-1 alpha-2"},
+        "accession": {"type": ["string", "null"], "description": "The lab's own identifier for this report."}
+      }
+    },
+    "language": {
+      "type": ["string", "null"],
+      "description": "BCP 47 tag of the document's primary language, as detected.",
+      "examples": ["zh-Hans", "en"]
+    },
+    "extraction": {
+      "type": ["object", "null"],
+      "description": "How the structured data was obtained. Recorded so an extraction can be reproduced, audited, or re-run with a better model years later.",
+      "additionalProperties": true,
+      "properties": {
+        "method": {"type": "string", "enum": ["ai_vision", "manual", "import", "ai_vision+manual"]},
+        "model": {"type": ["string", "null"], "description": "Exact model identifier used."},
+        "prompt_version": {"type": ["string", "null"]},
+        "extracted_at": {"type": ["string", "null"], "format": "date-time"},
+        "input_tokens": {"type": ["integer", "null"]},
+        "output_tokens": {"type": ["integer", "null"]},
+        "warnings": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "review": {
+      "type": ["object", "null"],
+      "description": "Human verification. An AI extraction is a draft until a person confirms it; analytics can filter on this.",
+      "additionalProperties": true,
+      "properties": {
+        "status": {"type": "string", "enum": ["unreviewed", "verified", "corrected", "rejected"]},
+        "reviewed_by": {"type": ["string", "null"]},
+        "reviewed_at": {"type": ["string", "null"], "format": "date-time"},
+        "note": {"type": ["string", "null"]}
+      }
+    },
+    "narrative": {
+      "type": "array",
+      "description": "Prose sections that are not measurements: findings, impressions, clinical history. Preserved in the original language with a translation alongside, because the wording of an impression carries meaning that a code cannot.",
+      "items": {
+        "type": "object",
+        "required": ["section", "text_raw"],
+        "additionalProperties": true,
+        "properties": {
+          "section": {"type": "string", "examples": ["findings", "impression", "clinical_history", "technique"]},
+          "text_raw": {"type": "string"},
+          "text_en": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "tags": {"type": "array", "items": {"type": "string"}},
+    "notes": {"type": ["string", "null"], "description": "Free text added by the owner."}
+  }
+}

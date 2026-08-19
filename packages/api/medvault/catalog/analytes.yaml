@@ -1,0 +1,388 @@
+# The analyte catalogue.
+#
+# This file is DATA, not schema. Adding a measurement that nobody had thought of
+# when this was written means appending an entry here — no migration, no code
+# change, no downtime. Observations whose label matches nothing here are still
+# stored, under an `UNMAPPED:` code with their printed label intact, and are
+# picked up automatically once an entry is added and `medvault reindex` runs.
+#
+# Fields:
+#   code            canonical identity, `SYSTEM:CODE`. Prefer LOINC; `MV:` is
+#                   the local namespace for things LOINC does not cover.
+#   name            English display name.
+#   unit            canonical unit. Every value for this analyte is converted
+#                   to it so a decade of results share one axis.
+#   category        groups the analyte in the UI and in correlation views.
+#   synonyms        every printed spelling seen in the wild, any language.
+#                   Matching is case- and punctuation-insensitive.
+#   body_site       default site, for measurements that imply one.
+#   higher_is_worse used only to colour the UI; never to decide anything.
+#
+# The synonym lists lean heavily on Chinese because that is where these reports
+# come from. They are lowercased before comparison, so case here is cosmetic.
+
+version: 3
+analytes:
+
+  # ---------------------------------------------------------------- haematology
+  - code: LOINC:6690-2
+    name: White blood cell count
+    unit: 10*9/L
+    category: haematology
+    synonyms: [WBC, 白细胞, 白细胞计数, 白血球, leukocytes, leucocyte count]
+  - code: LOINC:789-8
+    name: Red blood cell count
+    unit: 10*12/L
+    category: haematology
+    synonyms: [RBC, 红细胞, 红细胞计数, erythrocytes]
+  - code: LOINC:718-7
+    name: Haemoglobin
+    unit: g/L
+    category: haematology
+    synonyms: [HGB, HB, 血红蛋白, 血色素, hemoglobin, haemoglobin]
+  - code: LOINC:4544-3
+    name: Haematocrit
+    unit: '%'
+    category: haematology
+    synonyms: [HCT, 红细胞压积, 血细胞比容, hematocrit]
+  - code: LOINC:777-3
+    name: Platelet count
+    unit: 10*9/L
+    category: haematology
+    synonyms: [PLT, 血小板, 血小板计数, platelets]
+  - code: LOINC:787-2
+    name: Mean corpuscular volume
+    unit: fL
+    category: haematology
+    synonyms: [MCV, 平均红细胞体积]
+  - code: LOINC:785-6
+    name: Mean corpuscular haemoglobin
+    unit: pg
+    category: haematology
+    synonyms: [MCH, 平均红细胞血红蛋白量]
+  - code: LOINC:786-4
+    name: Mean corpuscular haemoglobin concentration
+    unit: g/L
+    category: haematology
+    synonyms: [MCHC, 平均红细胞血红蛋白浓度]
+  - code: LOINC:770-8
+    name: Neutrophils percentage
+    unit: '%'
+    category: haematology
+    synonyms: [NEUT%, 中性粒细胞百分比, 中性粒细胞比率, neutrophil %]
+  - code: LOINC:736-9
+    name: Lymphocytes percentage
+    unit: '%'
+    category: haematology
+    synonyms: [LYMPH%, 淋巴细胞百分比, 淋巴细胞比率]
+  - code: LOINC:30180-4
+    name: Erythrocyte sedimentation rate
+    unit: mm/h
+    category: haematology
+    synonyms: [ESR, 血沉, 红细胞沉降率]
+
+  # ------------------------------------------------------------------ metabolic
+  - code: LOINC:2345-7
+    name: Glucose, fasting
+    unit: mmol/L
+    category: metabolic
+    higher_is_worse: true
+    synonyms: [GLU, 血糖, 空腹血糖, 葡萄糖, fasting glucose, glucose]
+  - code: LOINC:4548-4
+    name: Haemoglobin A1c
+    unit: '%'
+    category: metabolic
+    higher_is_worse: true
+    synonyms: [HbA1c, A1c, 糖化血红蛋白]
+  - code: LOINC:2093-3
+    name: Cholesterol, total
+    unit: mmol/L
+    category: lipids
+    higher_is_worse: true
+    synonyms: [TC, CHOL, 总胆固醇, 胆固醇, total cholesterol]
+  - code: LOINC:2085-9
+    name: HDL cholesterol
+    unit: mmol/L
+    category: lipids
+    higher_is_worse: false
+    synonyms: [HDL, HDL-C, 高密度脂蛋白, 高密度脂蛋白胆固醇]
+  - code: LOINC:2089-1
+    name: LDL cholesterol
+    unit: mmol/L
+    category: lipids
+    higher_is_worse: true
+    synonyms: [LDL, LDL-C, 低密度脂蛋白, 低密度脂蛋白胆固醇]
+  - code: LOINC:2571-8
+    name: Triglycerides
+    unit: mmol/L
+    category: lipids
+    higher_is_worse: true
+    synonyms: [TG, 甘油三酯, 三酰甘油]
+  - code: LOINC:3084-1
+    name: Uric acid
+    unit: umol/L
+    category: metabolic
+    higher_is_worse: true
+    synonyms: [UA, 尿酸]
+
+  # ---------------------------------------------------------------------- liver
+  - code: LOINC:1742-6
+    name: Alanine aminotransferase
+    unit: U/L
+    category: liver
+    higher_is_worse: true
+    synonyms: [ALT, GPT, 丙氨酸氨基转移酶, 谷丙转氨酶]
+  - code: LOINC:1920-8
+    name: Aspartate aminotransferase
+    unit: U/L
+    category: liver
+    higher_is_worse: true
+    synonyms: [AST, GOT, 天门冬氨酸氨基转移酶, 谷草转氨酶]
+  - code: LOINC:2324-2
+    name: Gamma-glutamyl transferase
+    unit: U/L
+    category: liver
+    higher_is_worse: true
+    synonyms: [GGT, γ-谷氨酰转移酶, 谷氨酰转肽酶]
+  - code: LOINC:6768-6
+    name: Alkaline phosphatase
+    unit: U/L
+    category: liver
+    synonyms: [ALP, AKP, 碱性磷酸酶]
+  - code: LOINC:1975-2
+    name: Bilirubin, total
+    unit: umol/L
+    category: liver
+    higher_is_worse: true
+    synonyms: [TBIL, 总胆红素]
+  - code: LOINC:1968-7
+    name: Bilirubin, direct
+    unit: umol/L
+    category: liver
+    higher_is_worse: true
+    synonyms: [DBIL, 直接胆红素, 结合胆红素]
+  - code: LOINC:2885-2
+    name: Protein, total
+    unit: g/L
+    category: liver
+    synonyms: [TP, 总蛋白]
+  - code: LOINC:1751-7
+    name: Albumin
+    unit: g/L
+    category: liver
+    synonyms: [ALB, 白蛋白]
+
+  # --------------------------------------------------------------------- kidney
+  - code: LOINC:2160-0
+    name: Creatinine
+    unit: umol/L
+    category: kidney
+    higher_is_worse: true
+    synonyms: [CREA, CR, 肌酐, 血肌酐]
+  - code: LOINC:3094-0
+    name: Urea nitrogen
+    unit: mmol/L
+    category: kidney
+    higher_is_worse: true
+    synonyms: [BUN, UREA, 尿素氮, 尿素]
+  - code: LOINC:33914-3
+    name: Estimated glomerular filtration rate
+    unit: mL/min/{1.73_m2}
+    category: kidney
+    higher_is_worse: false
+    synonyms: [eGFR, GFR, 肾小球滤过率]
+
+  # -------------------------------------------------------------------- thyroid
+  - code: LOINC:3016-3
+    name: Thyroid stimulating hormone
+    unit: m[IU]/L
+    category: endocrine
+    synonyms: [TSH, 促甲状腺激素]
+  - code: LOINC:3053-6
+    name: Free triiodothyronine
+    unit: pmol/L
+    category: endocrine
+    synonyms: [FT3, 游离三碘甲状腺原氨酸]
+  - code: LOINC:3024-7
+    name: Free thyroxine
+    unit: pmol/L
+    category: endocrine
+    synonyms: [FT4, 游离甲状腺素]
+
+  # ---------------------------------------------------------------------- vitals
+  - code: LOINC:8480-6
+    name: Systolic blood pressure
+    unit: mm[Hg]
+    category: vitals
+    higher_is_worse: true
+    synonyms: [SBP, 收缩压, systolic]
+  - code: LOINC:8462-4
+    name: Diastolic blood pressure
+    unit: mm[Hg]
+    category: vitals
+    higher_is_worse: true
+    synonyms: [DBP, 舒张压, diastolic]
+  - code: LOINC:29463-7
+    name: Body weight
+    unit: kg
+    category: vitals
+    synonyms: [体重, weight]
+  - code: LOINC:39156-5
+    name: Body mass index
+    unit: kg/m2
+    category: vitals
+    higher_is_worse: true
+    synonyms: [BMI, 体重指数, 身体质量指数]
+
+  # ------------------------------------------------------- abdominal ultrasound
+  # LOINC does not code individual organ dimensions, so these use the local
+  # `MV:` namespace. The naming pattern is organ.site.measurement.
+  - code: MV:liver.right-lobe.oblique-diameter
+    name: Liver right lobe oblique diameter
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: liver
+    synonyms: [右肝斜径, 肝右叶斜径, right hepatic oblique diameter]
+  - code: MV:liver.left-lobe.thickness
+    name: Liver left lobe thickness
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: liver
+    synonyms: [左肝厚径, 左肝厚度, 肝左叶厚径]
+  - code: MV:liver.left-lobe.length
+    name: Liver left lobe length
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: liver
+    synonyms: [左肝长径, 肝左叶长径]
+  - code: MV:portal-vein.diameter
+    name: Main portal vein diameter
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: portal-vein
+    synonyms: [MPV, 门静脉内径, 门静脉主干内径, 门脉内径]
+  - code: MV:inferior-vena-cava.diameter
+    name: Inferior vena cava diameter
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: inferior-vena-cava
+    synonyms: [IVC, 下腔静脉内径]
+  - code: MV:gallbladder.length
+    name: Gallbladder length
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: gallbladder
+    synonyms: [胆囊长径, 胆囊大小长, gallbladder length]
+  - code: MV:gallbladder.width
+    name: Gallbladder width
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: gallbladder
+    synonyms: [胆囊宽径, 胆囊前后径]
+  - code: MV:gallbladder.wall-thickness
+    name: Gallbladder wall thickness
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: gallbladder
+    higher_is_worse: true
+    synonyms: [胆囊壁厚, 胆囊壁厚度, 壁厚]
+  - code: MV:common-bile-duct.diameter
+    name: Common bile duct diameter
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: common-bile-duct
+    higher_is_worse: true
+    synonyms: [胆总管内径, 胆总管]
+  - code: MV:pancreas.thickness
+    name: Pancreas thickness
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: pancreas
+    synonyms: [胰腺厚度, 胰腺厚, 胰头厚]
+  - code: MV:spleen.thickness
+    name: Spleen thickness
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: spleen
+    higher_is_worse: true
+    synonyms: [脾脏厚度, 脾厚, 脾脏厚]
+  - code: MV:spleen.length
+    name: Spleen length
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: spleen
+    higher_is_worse: true
+    synonyms: [脾脏长径, 脾长, 脾脏长]
+  - code: MV:kidney.length
+    name: Kidney length
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: kidney
+    synonyms: [肾脏长径, 肾长径, 肾脏长, kidney length]
+  - code: MV:kidney.width
+    name: Kidney width
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: kidney
+    synonyms: [肾脏宽径, 肾宽径, 肾脏宽]
+  - code: MV:kidney.thickness
+    name: Kidney thickness
+    unit: mm
+    category: ultrasound-abdomen
+    body_site: kidney
+    synonyms: [肾脏厚径, 肾厚径, 肾脏厚]
+
+  # -------------------------------------------------------- vascular ultrasound
+  - code: MV:artery.intima-media-thickness
+    name: Intima-media thickness
+    unit: mm
+    category: ultrasound-vascular
+    higher_is_worse: true
+    synonyms: [IMT, 内中膜厚度, 内膜中层厚度, 内膜厚度, 内膜/中膜, intima-media thickness]
+  - code: MV:artery.diameter
+    name: Arterial diameter
+    unit: mm
+    category: ultrasound-vascular
+    synonyms: [血管内径, 内径, 前后径, arterial diameter]
+  - code: MV:artery.peak-systolic-velocity
+    name: Peak systolic velocity
+    unit: cm/s
+    category: ultrasound-vascular
+    synonyms: [PSV, 收缩期峰值流速, 峰值流速, 血流速峰值, peak systolic velocity]
+  - code: MV:artery.end-diastolic-velocity
+    name: End diastolic velocity
+    unit: cm/s
+    category: ultrasound-vascular
+    synonyms: [EDV, 舒张末期流速, 舒张期末流速]
+  - code: MV:artery.resistive-index
+    name: Resistive index
+    unit: '1'
+    category: ultrasound-vascular
+    higher_is_worse: true
+    synonyms: [RI, 阻力指数]
+
+# Body sites, so that "left kidney" and "right kidney" become two comparable
+# series rather than one interleaved mess. Laterality is stored separately.
+# Single-character synonyms are deliberately absent: see Catalog._detect_site.
+# 胆 alone would match 胆固醇 (cholesterol) and file it under the gallbladder.
+body_sites:
+  - {code: liver, name: Liver, synonyms: [肝脏]}
+  - {code: gallbladder, name: Gallbladder, synonyms: [胆囊]}
+  - {code: pancreas, name: Pancreas, synonyms: [胰腺]}
+  - {code: spleen, name: Spleen, synonyms: [脾脏]}
+  - {code: kidney, name: Kidney, synonyms: [肾脏]}
+  - {code: portal-vein, name: Portal vein, synonyms: [门静脉, 门脉]}
+  - {code: inferior-vena-cava, name: Inferior vena cava, synonyms: [下腔静脉]}
+  - {code: common-bile-duct, name: Common bile duct, synonyms: [胆总管]}
+  - {code: common-carotid-artery, name: Common carotid artery, synonyms: [颈总动脉, 颈总A]}
+  # Generic carotid, for narrative lines that name no specific branch.
+  - {code: carotid-artery, name: Carotid artery, synonyms: [颈动脉]}
+  - {code: internal-carotid-artery, name: Internal carotid artery, synonyms: [颈内动脉, 颈内A]}
+  - {code: external-carotid-artery, name: External carotid artery, synonyms: [颈外动脉, 颈外A]}
+  - {code: vertebral-artery, name: Vertebral artery, synonyms: [椎动脉, 椎A]}
+  - {code: thyroid, name: Thyroid, synonyms: [甲状腺]}
+
+laterality:
+  left: [左, 左侧, L, left]
+  right: [右, 右侧, R, right]
+  bilateral: [双侧, 两侧, bilateral, both]

@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://minipi.net/medical-vault/schemas/subject.v1.json",
+  "title": "Medical Vault Subject, version 1",
+  "description": "A person whose records are held in this vault. Deliberately minimal: the vault stores results, not a clinical chart.",
+  "type": "object",
+  "required": ["schema_version", "subject_id", "tenant_id", "display_name"],
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": {"const": 1},
+    "subject_id": {"type": "string", "minLength": 1},
+    "tenant_id": {"type": "string", "minLength": 1},
+    "display_name": {"type": "string"},
+    "names_raw": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description": "Every spelling this person appears under across reports — Latin, Chinese characters, transliterations. Used to check that an uploaded document belongs to the subject it was filed under."
+    },
+    "birth_date": {"type": ["string", "null"], "format": "date", "description": "Enables age-at-test, which some reference ranges depend on."},
+    "sex_at_birth": {"type": ["string", "null"], "enum": ["male", "female", "intersex", "unknown", null], "description": "Recorded only because many laboratory reference ranges are stratified by it."},
+    "created_at": {"type": "string", "format": "date-time"},
+    "notes": {"type": ["string", "null"]}
+  }
+}

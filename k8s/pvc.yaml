@@ -1,0 +1,36 @@
+# The vault. This is the only irreplaceable thing in the deployment.
+#
+# No storageClassName, so it lands on `ssd` — NFS-backed on rpi-01's SSD and
+# included in the nightly backup to R2. Putting it on `local-path` would place a
+# decade of medical records on one node's SD card, unbacked-up and lost on a node
+# rebuild. See apps/README.md in home-cluster.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: medical-vault-data
+  namespace: medical-vault
+spec:
+  accessModes:
+    # ReadWriteOnce is what stops two API pods writing the vault at once.
+    - ReadWriteOnce
+  resources:
+    requests:
+      # Photographs of paper reports, a few hundred KB each. 20Gi is years of them.
+      storage: 20Gi
+---
+# The PostgreSQL data directory.
+#
+# Also on `ssd`, but for convenience rather than necessity: everything in this
+# volume is rebuildable from the vault with `medvault reindex`. If it is ever
+# lost, delete the PVC and let the init container repopulate it.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: medical-vault-db
+  namespace: medical-vault
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
