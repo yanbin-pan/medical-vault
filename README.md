@@ -20,7 +20,7 @@ that without loss.
 There are two stores, and only one of them matters.
 
 ```
-   photograph ──► extraction ──►  THE VAULT  ──► projection ──►  PostgreSQL ──► charts
+   photograph ──► extraction ──►  THE VAULT  ──► projection ──►   SQLite   ──► charts
                                 (plain files)                     (a cache)
                                       │                                │
                               canonical, append-only          disposable, rebuildable
@@ -31,7 +31,7 @@ alongside each one a JSON envelope and an NDJSON list of the measurements read
 from it. No database, no proprietary format. Nothing is ever modified or
 deleted; a correction is a new record that supersedes the old one.
 
-**PostgreSQL holds nothing of its own.** Every row in it was computed from the
+**The database holds nothing of its own.** Every row in it was computed from the
 vault and can be recomputed:
 
 ```bash
@@ -135,7 +135,7 @@ table above for why.
 - **Documents** — every upload, its original image, its readings, its provenance,
   and its supersession history.
 - **Multi-tenancy** — several households on one deployment, isolated at every
-  route, with PostgreSQL row-level security behind the application's own scoping.
+  route, and asserted by tests that try to cross the boundary on every one.
 
 Every chart has a table view, and units render the way a clinician writes them
 (`×10⁹/L`, not `10*9/L`).
@@ -148,7 +148,7 @@ Every chart has a table view, and units render the way a clinician writes them
 cd packages/api
 uv venv && uv pip install -e ".[dev]"
 export MEDVAULT_DEV_USER_EMAIL=you@example.com          # stands in for Cloudflare Access
-export MEDVAULT_DATABASE_URL=sqlite:///./medvault.db    # or point at PostgreSQL
+export MEDVAULT_DATABASE_URL=sqlite:///./medvault.db    # the default; nothing to run
 export MEDVAULT_ANTHROPIC_API_KEY=sk-ant-...            # only needed for uploads
 
 python scripts/seed_demo.py --vault ./vault             # plausible history, no API key needed
@@ -192,11 +192,10 @@ grep -c 'ENC\[' k8s/secret.sops.yaml     # must be 3 or more before committing
 git add k8s/secret.sops.yaml && git commit -m "Add the deployment secret"
 ```
 
-The database password appears twice, as `postgres-password` and inside
-`database-url`, and they must match. `./scripts/make-secret.sh` does the whole
-thing in one command if you prefer. Either way, to change a value later edit it
-in place with `sops k8s/secret.sops.yaml` — regenerating would hand PostgreSQL a
-password it is not expecting. Full detail in [`docs/operations.md`](docs/operations.md).
+There is one value in it, and no database password: the projection is SQLite in
+an `emptyDir`, rebuilt from the vault on every pod start, so there is nothing to
+authenticate to. To change the key later, edit in place with
+`sops k8s/secret.sops.yaml`. Full detail in [`docs/operations.md`](docs/operations.md).
 
 Then tag a release so the arm64 image is built, and point the manifests at it.
 
@@ -211,6 +210,11 @@ Notes that matter on this cluster:
   `CrashLoopBackOff` with `exec format error`, which reads like an app bug.
 - **A nightly CronJob runs `medvault verify`**, because silent bit-rot is the one
   failure a backup does not save you from: the corrupted file gets backed up too.
+- **One pod, one volume.** The projection is SQLite on an `emptyDir` rather than
+  a database server on its own PVC. At this scale — a family's results over
+  decades is tens of thousands of rows — a server process would buy concurrency
+  the ReadWriteOnce vault volume forbids anyway. Keeping it off NFS also avoids
+  the SQLite-over-NFS corruption this cluster warns about.
 
 Full detail in [`docs/operations.md`](docs/operations.md).
 

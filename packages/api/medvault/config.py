@@ -22,9 +22,19 @@ class Settings(BaseSettings):
     vault_path: Path = Path("./vault")
 
     # --- The derived index ---------------------------------------------------
-    # Losing this database is a non-event: `medvault reindex` rebuilds it from
-    # the vault. Nothing may be written here that is not also in the vault.
-    database_url: str = "postgresql+psycopg://medvault:medvault@localhost:5432/medvault"
+    # SQLite, because this database is a cache and nothing more. At the scale
+    # this application actually runs at -- a family's results over decades is
+    # tens of thousands of rows, single-digit megabytes -- a server process
+    # would buy concurrency the deployment cannot use anyway: the vault volume
+    # is ReadWriteOnce, so there is exactly one writer by construction.
+    #
+    # In the cluster this points at an emptyDir, not at the SSD. Losing it is a
+    # non-event by design: `medvault reindex` rebuilds it from the vault, and
+    # the pod does exactly that on every start. Keeping it off NFS also sidesteps
+    # SQLite's well-known locking problems there.
+    #
+    # Any SQLAlchemy URL works. PostgreSQL needs the `postgres` extra installed.
+    database_url: str = "sqlite:///./medvault.db"
 
     # --- Extraction ----------------------------------------------------------
     anthropic_api_key: str = ""

@@ -21,11 +21,15 @@ spec:
         runAsGroup: 10001
         fsGroup: 10001
       initContainers:
-        # Creates the schema and rebuilds the projection from the vault on every
-        # start. It is idempotent and cheap at this scale, and it means losing
-        # the database PVC is a non-event: delete it, restart, and the pod
-        # repopulates from the files. That property is the whole point of the
-        # design, so it is exercised on every deploy rather than trusted.
+        # Builds the projection from the vault before the API starts serving.
+        #
+        # This is not a migration step and it is not optional bookkeeping: the
+        # database lives in an emptyDir, so it is empty every time this pod
+        # starts, and this is what fills it. Doing it on every start means the
+        # rebuild path is exercised continuously rather than trusted.
+        #
+        # It is fast because the dataset is small: a family's results over
+        # decades is tens of thousands of rows.
         - name: reindex
           image: ghcr.io/yanbin-pan/medical-vault:0.1.0
           command: [sh, -ec]
@@ -36,9 +40,11 @@ spec:
           env: &medvault_env
             - name: MEDVAULT_VAULT_PATH
               value: /data/vault
+            # SQLite on the emptyDir below. Deliberately not on the SSD: this
+            # file is a cache, it needs no backup, and SQLite over NFS is the
+            # single most likely way to lose data on this cluster.
             - name: MEDVAULT_DATABASE_URL
-              valueFrom:
-                secretKeyRef: {name: medical-vault, key: database-url}
+              value: sqlite:////cache/medvault.db
             - name: MEDVAULT_ANTHROPIC_API_KEY
               valueFrom:
                 secretKeyRef: {name: medical-vault, key: anthropic-api-key}
@@ -53,8 +59,10 @@ spec:
           volumeMounts: &medvault_mounts
             - name: vault
               mountPath: /data/vault
+            - name: cache
+              mountPath: /cache
           resources:
-            requests: {cpu: 50m, memory: 128Mi}
+            requests: {cpu: 100m, memory: 128Mi}
             limits: {memory: 512Mi}
       containers:
         - name: api
@@ -65,11 +73,11 @@ spec:
           volumeMounts: *medvault_mounts
           readinessProbe:
             httpGet: {path: /api/health, port: 8000}
-            initialDelaySeconds: 10
+            initialDelaySeconds: 5
             periodSeconds: 15
           livenessProbe:
             httpGet: {path: /api/health, port: 8000}
-            initialDelaySeconds: 30
+            initialDelaySeconds: 20
             periodSeconds: 30
           resources:
             requests: {cpu: 100m, memory: 256Mi}
@@ -81,6 +89,11 @@ spec:
         - name: vault
           persistentVolumeClaim:
             claimName: medical-vault-data
+        - name: cache
+          # The whole projection. Rebuilt from the vault on every start, so it
+          # is correct for it to vanish with the pod — and keeping it out of the
+          # NFS volume avoids SQLite's locking problems there entirely.
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

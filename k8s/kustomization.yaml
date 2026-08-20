@@ -5,7 +5,6 @@ resources:
   - namespace.yaml
   - secret.sops.yaml
   - pvc.yaml
-  - postgres.yaml
   - deployment.yaml
   - ingress.yaml
   - verify-cronjob.yaml

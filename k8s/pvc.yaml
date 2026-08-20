@@ -1,9 +1,14 @@
-# The vault. This is the only irreplaceable thing in the deployment.
+# The vault. This is the only stateful thing in the deployment, and the only
+# irreplaceable one.
 #
 # No storageClassName, so it lands on `ssd` — NFS-backed on rpi-01's SSD and
-# included in the nightly backup to R2. Putting it on `local-path` would place a
+# included in the nightly backup. Putting it on `local-path` would place a
 # decade of medical records on one node's SD card, unbacked-up and lost on a node
 # rebuild. See apps/README.md in home-cluster.
+#
+# There is deliberately no second volume for the database. The projection is a
+# cache that the pod rebuilds from these files on every start, so it lives in an
+# emptyDir — see deployment.yaml.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -17,20 +22,3 @@ spec:
     requests:
       # Photographs of paper reports, a few hundred KB each. 20Gi is years of them.
       storage: 20Gi
----
-# The PostgreSQL data directory.
-#
-# Also on `ssd`, but for convenience rather than necessity: everything in this
-# volume is rebuildable from the vault with `medvault reindex`. If it is ever
-# lost, delete the PVC and let the init container repopulate it.
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: medical-vault-db
-  namespace: medical-vault
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi

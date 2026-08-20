@@ -33,17 +33,32 @@ def get_engine() -> Engine:
             future=True,
         )
         if _engine.dialect.name == "sqlite":
-            _enable_sqlite_foreign_keys(_engine)
+            _configure_sqlite(_engine)
     return _engine
 
 
-def _enable_sqlite_foreign_keys(engine: Engine) -> None:
-    """SQLite ignores foreign keys unless asked, which hides referential bugs in tests."""
+def _configure_sqlite(engine: Engine) -> None:
+    """Pragmas SQLite needs to behave under a threaded web server.
+
+    FastAPI runs synchronous handlers in a thread pool, so several threads can
+    reach the same database at once. Left at its defaults SQLite answers that
+    with `database is locked`, intermittently and under load, which is a
+    miserable thing to debug.
+    """
 
     @event.listens_for(engine, "connect")
     def _set_pragma(dbapi_connection, _record):  # noqa: ANN001
         cursor = dbapi_connection.cursor()
+        # Foreign keys are off unless asked for, which hides referential bugs.
         cursor.execute("PRAGMA foreign_keys=ON")
+        # WAL lets readers carry on while a reindex writes. Skipped for
+        # in-memory databases, where it does not apply.
+        if engine.url.database not in (None, ":memory:"):
+            cursor.execute("PRAGMA journal_mode=WAL")
+        # Wait for a competing writer rather than failing immediately. A full
+        # reindex is the longest write there is, and it is measured in seconds.
+        cursor.execute("PRAGMA busy_timeout=15000")
+        cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.close()
 
 

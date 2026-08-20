@@ -1,7 +1,7 @@
 """Rebuilding the database from the vault.
 
 This module is the load-bearing proof of the whole design. If it works, the
-PostgreSQL database is a cache; if it does not, the vault is decoration and the
+database is a cache; if it does not, the vault is decoration and the
 database has quietly become the real system.
 
 So it is written to one rule: **it reads only the vault.** It never reads the

@@ -12,28 +12,25 @@ Everything here assumes the `home-cluster` conventions: Flux reconciles from
    ```bash
    cd medical-vault
    cp k8s/secret.sops.yaml.example k8s/secret.sops.yaml
-   $EDITOR k8s/secret.sops.yaml
+   $EDITOR k8s/secret.sops.yaml          # replace sk-ant-REPLACE-ME, and drop
+                                          # the instruction comments at the top
+   sops --encrypt --in-place k8s/secret.sops.yaml
    ```
 
-   Fill in three values, and delete the instruction comments at the top:
-
-   - `anthropic-api-key` — your `sk-ant-...` key.
-   - `postgres-password` — any long random string. Generate one with
-     `head -c 1024 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | cut -c1-40`.
-     Keep it alphanumeric: it is substituted into a connection URL, where a `/`
-     or `@` would change how the URL parses rather than failing outright.
-   - `database-url` — the **same password again**, between `medvault:` and
-     `@postgres`. If these two drift apart PostgreSQL refuses the connection,
-     with an authentication error that looks nothing like its cause.
-
-   Then encrypt it in place and confirm before committing:
+   Then confirm before committing — this is the irreversible moment:
 
    ```bash
-   sops --encrypt --in-place k8s/secret.sops.yaml
-   grep -c 'ENC\[' k8s/secret.sops.yaml     # must be 3 or more
-   grep -q 'sk-ant-' k8s/secret.sops.yaml && echo "STOP: key still readable"
+   grep -c 'ENC\[' k8s/secret.sops.yaml     # expect 1 or more
+   grep 'sk-ant-' k8s/secret.sops.yaml      # expect NO output
    git add k8s/secret.sops.yaml && git commit -m "Add the deployment secret"
    ```
+
+   If the second command prints anything, the key is still in plaintext. Delete
+   the file and start again rather than committing it: a key in git history is
+   not removed by deleting it in a later commit.
+
+   There is exactly one value here. The projection is SQLite on an `emptyDir`,
+   so there is no database password and nothing to authenticate to.
 
    `.sops.yaml` at the root of this repository supplies the age recipient and
    restricts encryption to `stringData`, so metadata stays readable and a diff
@@ -44,13 +41,8 @@ Everything here assumes the `home-cluster` conventions: Flux reconciles from
    as a resource — and the Flux Kustomization never goes Ready. That is
    deliberate: a deployment missing its credentials should not half-start.
 
-   **To rotate a value afterwards, edit in place** — `sops k8s/secret.sops.yaml`
-   opens the decrypted file in your editor and re-encrypts on save. Do not
-   regenerate the file: that would mint a new database password while PostgreSQL
-   still holds the old one in its PVC.
-
-   `./scripts/make-secret.sh` does the same thing in one command, if you would
-   rather not do it by hand.
+   **To rotate the key later, edit in place** — `sops k8s/secret.sops.yaml`
+   opens the decrypted file in your editor and re-encrypts on save.
 
 2. **Build the image.** Tag a release; the workflow builds `linux/arm64` and
    pushes to GHCR.
@@ -131,18 +123,22 @@ kubectl -n medical-vault logs job/<name>
 
 ### The database is broken or lost
 
-Not an incident. Delete it and let it rebuild:
+Not an incident, and usually not even an action. The projection is SQLite in an
+`emptyDir`: it is discarded and rebuilt from the vault every time the pod
+starts, so restarting the pod is the whole repair.
 
 ```bash
-kubectl -n medical-vault delete deploy postgres
-kubectl -n medical-vault delete pvc medical-vault-db
-# re-apply by forcing a reconcile; the init container recreates the schema
-flux reconcile kustomization medical-vault --with-source
+kubectl -n medical-vault rollout restart deploy/medical-vault
 ```
 
-The init container runs `medvault init-db && medvault reindex` on every start,
-so the projection repopulates from the vault by itself. This path is exercised
-on every deploy rather than trusted.
+The init container runs `medvault init-db && medvault reindex` before the API
+starts serving, so this path is exercised on every deploy rather than trusted.
+
+If you would rather rebuild without a restart:
+
+```bash
+kubectl -n medical-vault exec deploy/medical-vault -- medvault reindex
+```
 
 ### The vault is lost
 

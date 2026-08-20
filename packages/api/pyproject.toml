@@ -9,8 +9,6 @@ dependencies = [
     "pydantic>=2.9",
     "pydantic-settings>=2.6",
     "sqlalchemy>=2.0.36",
-    "psycopg[binary]>=3.2",
-    "alembic>=1.14",
     "python-multipart>=0.0.17",
     "anthropic>=0.69",
     "pyyaml>=6.0",
@@ -22,6 +20,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3", "pytest-asyncio>=0.24", "httpx>=0.27", "ruff>=0.8"]
+# The projection runs on SQLite by default. Install this to point
+# MEDVAULT_DATABASE_URL at PostgreSQL instead; no code change is needed.
+postgres = ["psycopg[binary]>=3.2"]
 
 [project.scripts]
 medvault = "medvault.cli:main"
