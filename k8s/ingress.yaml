@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: medical-vault
+  namespace: medical-vault
+  annotations:
+    # Phone photographs of paper reports. Traefik's default body limit is far
+    # below this and rejects a normal upload with a bare 413.
+    traefik.ingress.kubernetes.io/router.middlewares: medical-vault-body-limit@kubernetescrd
+spec:
+  # Traefik ships with k3s and is what the Cloudflare tunnel forwards to. No TLS
+  # block and no cert-manager annotation: TLS terminates at Cloudflare's edge.
+  ingressClassName: traefik
+  rules:
+    - host: medvault.minipi.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: medical-vault
+                port: {number: 80}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: body-limit
+  namespace: medical-vault
+spec:
+  buffering:
+    # Matches MAX_UPLOAD_BYTES in the API, which rejects anything larger with a
+    # message rather than a truncated stream.
+    maxRequestBodyBytes: 26214400
+    memRequestBodyBytes: 2097152

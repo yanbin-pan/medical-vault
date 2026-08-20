@@ -1,0 +1,72 @@
+# postgres:16-alpine publishes linux/arm64. Verified before deploying:
+#   docker run --rm mplatform/mquery postgres:16-alpine
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: medical-vault
+spec:
+  replicas: 1
+  strategy:
+    # Recreate, not RollingUpdate: two postgres pods must never open the same
+    # data directory, and the PVC is ReadWriteOnce anyway.
+    type: Recreate
+  selector:
+    matchLabels: {app: postgres}
+  template:
+    metadata:
+      labels: {app: postgres}
+    spec:
+      securityContext:
+        fsGroup: 999
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          env:
+            - name: POSTGRES_USER
+              value: medvault
+            - name: POSTGRES_DB
+              value: medvault
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: medical-vault, key: postgres-password}
+            # The volume root is an NFS mount point; postgres refuses to
+            # initialise into a directory it does not own, so it gets a
+            # subdirectory it can.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, medvault, -d, medvault]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: [pg_isready, -U, medvault, -d, medvault]
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            # Total cluster memory is 24GB across four nodes; an unbounded
+            # postgres can evict everything else.
+            limits: {memory: 512Mi}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: medical-vault-db
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: medical-vault
+spec:
+  selector: {app: postgres}
+  ports:
+    - port: 5432
+      targetPort: 5432

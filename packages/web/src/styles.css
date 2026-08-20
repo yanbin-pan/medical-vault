@@ -1,0 +1,246 @@
+/* Design tokens.
+ *
+ * Colours come from the validated reference palette. The categorical slots are
+ * used in fixed order and never cycled; the correlation heatmap uses the
+ * diverging blue-to-red pair with a neutral grey midpoint, because a
+ * correlation has polarity and a rainbow would invent structure that is not in
+ * the data.
+ *
+ * Dark mode is a selected set of steps for the dark surface, not an inversion.
+ */
+
+:root {
+  color-scheme: light;
+
+  --surface-1: #fcfcfb;
+  --page: #f9f9f7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #898781;
+  --gridline: #e1e0d9;
+  --baseline: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.1);
+
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+  --success-text: #006300;
+
+  /* Diverging ramp for correlation: blue (negative) - grey - red (positive). */
+  --div-neg-3: #184f95;
+  --div-neg-2: #2a78d6;
+  --div-neg-1: #9ec5f4;
+  --div-mid: #f0efec;
+  --div-pos-1: #f3b4b4;
+  --div-pos-2: #d03b3b;
+  --div-pos-3: #8f2020;
+
+  --radius: 10px;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --page: #0d0d0d;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #898781;
+    --gridline: #2c2c2a;
+    --baseline: #383835;
+    --border: rgba(255, 255, 255, 0.1);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --success-text: #0ca30c;
+    --div-neg-3: #104281;
+    --div-neg-2: #3987e5;
+    --div-neg-1: #256abf;
+    --div-mid: #383835;
+    --div-pos-1: #8f2020;
+    --div-pos-2: #d03b3b;
+    --div-pos-3: #e66767;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --page: #0d0d0d;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #898781;
+  --gridline: #2c2c2a;
+  --baseline: #383835;
+  --border: rgba(255, 255, 255, 0.1);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --success-text: #0ca30c;
+  --div-neg-3: #104281;
+  --div-neg-2: #3987e5;
+  --div-neg-1: #256abf;
+  --div-mid: #383835;
+  --div-pos-1: #8f2020;
+  --div-pos-2: #d03b3b;
+  --div-pos-3: #e66767;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  background: var(--page);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--series-1); }
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px 20px 64px;
+}
+
+header.masthead {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+}
+
+.masthead h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+.masthead .sub { color: var(--text-secondary); font-size: 13px; }
+
+nav.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+
+nav.tabs a {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  text-decoration: none;
+  color: var(--text-secondary);
+}
+
+nav.tabs a.active { background: var(--text-primary); color: var(--surface-1); }
+nav.tabs a:hover:not(.active) { background: var(--gridline); }
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.grid { display: grid; gap: 16px; }
+.grid.tiles { grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); }
+.grid.charts { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); }
+
+.tile .label { font-size: 12px; color: var(--text-secondary); }
+.tile .value { font-size: 28px; margin-top: 4px; letter-spacing: -0.02em; }
+.tile .note { font-size: 12px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }
+/* A pill in a stat tile must wrap inside the card rather than spill past its
+   edge — these notes are free text and can be longer than the tile is wide. */
+.tile .note .pill { white-space: normal; max-width: 100%; }
+
+.chart-head { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.chart-title { font-size: 14px; font-weight: 600; margin: 0; }
+.chart-sub { font-size: 12px; color: var(--text-muted); margin: 2px 0 0; }
+
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--text-secondary); margin-top: 8px; }
+.legend .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 5px; vertical-align: -1px; }
+
+.muted { color: var(--text-muted); }
+.small { font-size: 12px; }
+
+table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.data th, table.data td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+table.data th { color: var(--text-secondary); font-weight: 600; font-size: 12px; }
+table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+.pill.warn { border-color: var(--status-warning); color: var(--status-warning); }
+.pill.crit { border-color: var(--status-critical); color: var(--status-critical); }
+.pill.ok { border-color: var(--status-good); color: var(--status-good); }
+
+button, .btn {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+button.primary { background: var(--text-primary); color: var(--surface-1); border-color: transparent; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+
+select, input[type="text"], input[type="date"], input[type="file"] {
+  font: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text-primary);
+}
+
+.tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  z-index: 40;
+  max-width: 260px;
+}
+.tooltip .t-title { font-weight: 600; margin-bottom: 2px; }
+.tooltip .t-row { color: var(--text-secondary); }
+
+.banner {
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  margin-bottom: 16px;
+}
+.banner.warn { border-left: 3px solid var(--status-warning); }
+.banner.err { border-left: 3px solid var(--status-critical); }
+
+.doc-layout { display: grid; grid-template-columns: minmax(260px, 1fr) 2fr; gap: 16px; align-items: start; }
+.doc-layout img { width: 100%; border-radius: var(--radius); border: 1px solid var(--border); }
+
+@media (max-width: 780px) {
+  .doc-layout { grid-template-columns: 1fr; }
+}
+
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
