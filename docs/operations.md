@@ -5,18 +5,29 @@ Everything here assumes the `home-cluster` conventions: Flux reconciles from
 
 ## First deployment
 
-1. **Create the Secret.** The one step that cannot be automated, because the age
-   key is deliberately not in any repository.
+1. **Create the Secret.** The one step that cannot happen in CI, because the age
+   key is deliberately not in any repository. Run it wherever the key lives:
 
    ```bash
-   cp k8s/secret.sops.yaml.example k8s/secret.sops.yaml
-   $EDITOR k8s/secret.sops.yaml
-   sops --encrypt --in-place k8s/secret.sops.yaml
-   grep -c 'ENC\[' k8s/secret.sops.yaml     # must be > 0 before committing
+   ./scripts/make-secret.sh
+   git add k8s/secret.sops.yaml && git commit -m "Add the deployment secret"
    ```
 
-   The password appears twice — once as `postgres-password`, once inside
-   `database-url`. They must match.
+   Nothing here needs `k8s/kustomization.yaml` to be reachable until this file
+   exists: it is listed as a resource, so `kustomize build` fails outright
+   without it and the Flux Kustomization never goes Ready. That is deliberate —
+   a deployment missing its credentials should not half-start.
+
+   The script exists to remove two ways of getting this wrong by hand. The
+   database password appears twice — as `postgres-password` and inside
+   `database-url` — and PostgreSQL simply refuses the connection if they drift
+   apart. And a plaintext secret must not survive a failed encryption long
+   enough to be committed, so the script deletes it on any error path.
+
+   **To rotate a value afterwards, edit in place** — `sops k8s/secret.sops.yaml`.
+   Re-running the script would mint a new database password while PostgreSQL
+   still holds the old one in its PVC, and the API would fail to connect with an
+   authentication error that looks nothing like its cause.
 
 2. **Build the image.** Tag a release; the workflow builds `linux/arm64` and
    pushes to GHCR.

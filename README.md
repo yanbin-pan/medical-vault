@@ -182,14 +182,18 @@ Manifests are in [`k8s/`](k8s/) and Flux picks them up from
 [`clusters/home/medical-vault.yaml`](https://github.com/yanbin-pan/home-cluster)
 in the home-cluster repository.
 
-One manual step, once:
+One manual step, once, on a machine that has the cluster's age key:
 
 ```bash
-cp k8s/secret.sops.yaml.example k8s/secret.sops.yaml
-$EDITOR k8s/secret.sops.yaml            # API key, database password
-sops --encrypt --in-place k8s/secret.sops.yaml
-grep -c 'ENC\[' k8s/secret.sops.yaml    # must be > 0
+./scripts/make-secret.sh            # prompts for the Anthropic API key
+git add k8s/secret.sops.yaml && git commit -m "Add the deployment secret"
 ```
+
+It generates the database password, writes it to the two places that must
+agree, encrypts the result with SOPS, and refuses to leave an unencrypted file
+behind if anything fails. To change a value later, edit it in place with
+`sops k8s/secret.sops.yaml` — regenerating would hand PostgreSQL a password it
+is not expecting.
 
 Then tag a release so the arm64 image is built, and point the manifests at it.
 
