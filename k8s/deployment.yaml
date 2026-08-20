@@ -21,28 +21,28 @@ spec:
         runAsGroup: 10001
         fsGroup: 10001
       initContainers:
-        # Builds the projection from the vault before the API starts serving.
+        # Brings the projection up to date before the API starts serving.
         #
-        # This is not a migration step and it is not optional bookkeeping: the
-        # database lives in an emptyDir, so it is empty every time this pod
-        # starts, and this is what fills it. Doing it on every start means the
-        # rebuild path is exercised continuously rather than trusted.
-        #
-        # It is fast because the dataset is small: a family's results over
-        # decades is tens of thousands of rows.
+        # `--if-needed` makes this a no-op on an ordinary deploy: the database
+        # is on its own volume and survives restarts, so there is nothing to do
+        # unless it is empty or the analyte catalogue has changed. That second
+        # case is the useful one — a catalogue bump means every stored code and
+        # canonical unit was derived under old rules, so the rebuild is exactly
+        # what retrofits the whole history.
         - name: reindex
           image: ghcr.io/yanbin-pan/medical-vault:0.1.0
           command: [sh, -ec]
           args:
             - |
               medvault init-db
-              medvault reindex
+              medvault reindex --if-needed
           env: &medvault_env
             - name: MEDVAULT_VAULT_PATH
               value: /data/vault
-            # SQLite on the emptyDir below. Deliberately not on the SSD: this
-            # file is a cache, it needs no backup, and SQLite over NFS is the
-            # single most likely way to lose data on this cluster.
+            # SQLite on its own SSD-backed volume, mounted below. The journal
+            # mode is not set here: the application detects that this path is on
+            # an NFS mount and drops from WAL to a rollback journal by itself,
+            # because WAL cannot work across a network filesystem.
             - name: MEDVAULT_DATABASE_URL
               value: sqlite:////cache/medvault.db
             - name: MEDVAULT_ANTHROPIC_API_KEY
@@ -90,10 +90,8 @@ spec:
           persistentVolumeClaim:
             claimName: medical-vault-data
         - name: cache
-          # The whole projection. Rebuilt from the vault on every start, so it
-          # is correct for it to vanish with the pod — and keeping it out of the
-          # NFS volume avoids SQLite's locking problems there entirely.
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: medical-vault-cache
 ---
 apiVersion: v1
 kind: Service

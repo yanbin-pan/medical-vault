@@ -29,7 +29,7 @@ Everything here assumes the `home-cluster` conventions: Flux reconciles from
    the file and start again rather than committing it: a key in git history is
    not removed by deleting it in a later commit.
 
-   There is exactly one value here. The projection is SQLite on an `emptyDir`,
+   There is exactly one value here. The projection is SQLite on its own volume,
    so there is no database password and nothing to authenticate to.
 
    `.sops.yaml` at the root of this repository supplies the age recipient and
@@ -123,22 +123,35 @@ kubectl -n medical-vault logs job/<name>
 
 ### The database is broken or lost
 
-Not an incident, and usually not even an action. The projection is SQLite in an
-`emptyDir`: it is discarded and rebuilt from the vault every time the pod
-starts, so restarting the pod is the whole repair.
-
-```bash
-kubectl -n medical-vault rollout restart deploy/medical-vault
-```
-
-The init container runs `medvault init-db && medvault reindex` before the API
-starts serving, so this path is exercised on every deploy rather than trusted.
-
-If you would rather rebuild without a restart:
+Not an incident. Everything in the projection is derived, so the repair is to
+throw it away and let it rebuild:
 
 ```bash
 kubectl -n medical-vault exec deploy/medical-vault -- medvault reindex
 ```
+
+If the file itself is unreadable — the realistic SQLite-over-NFS failure, which
+shows up as `disk I/O error` or `database disk image is malformed` rather than
+anything subtle — delete it and restart. The init container rebuilds it because
+the projection is then empty:
+
+```bash
+kubectl -n medical-vault exec deploy/medical-vault -- rm -f /cache/medvault.db
+kubectl -n medical-vault rollout restart deploy/medical-vault
+```
+
+Losing the whole PVC is the same story with an extra step: delete the PVC, let
+Flux recreate it, and the pod repopulates on start.
+
+**Why this is a tolerable risk at all.** SQLite over NFS is normally a bad idea,
+and this cluster's own guidance says so. Three things make it acceptable here:
+the Deployment is one replica with `Recreate` against a ReadWriteOnce volume, so
+there is exactly one process holding the file; the mount is NFSv4.2, whose
+lease-based locking is far more reliable than NFSv3's separate lock daemon; and
+the file is a cache, so the worst outcome is a rebuild rather than data loss.
+The application does not use a write-ahead log on that mount — it detects the
+filesystem type at startup and falls back to a rollback journal, because WAL
+needs shared memory that does not exist across a network mount.
 
 ### The vault is lost
 

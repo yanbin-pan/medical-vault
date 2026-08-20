@@ -67,11 +67,51 @@ def _apply_rls(engine) -> None:  # noqa: ANN001
 def cmd_reindex(args: argparse.Namespace) -> int:
     vault = _vault(args)
     with session_scope() as session:
+        if getattr(args, "if_needed", False):
+            reason = _reindex_reason(session)
+            if reason is None:
+                print("projection is current; nothing to rebuild")
+                return 0
+            print(f"rebuilding: {reason}")
         report = reindex(session, vault, tenant_id=args.tenant)
     print(report.summary())
     for problem in report.problems:
         print(f"  problem: {problem}", file=sys.stderr)
     return 1 if report.problems and args.strict else 0
+
+
+def _reindex_reason(session) -> str | None:  # noqa: ANN001
+    """Why the projection needs rebuilding, or None if it does not.
+
+    Two things make it stale, and the second is the interesting one:
+
+    * There is nothing in it — a new or wiped database.
+    * The analyte catalogue has changed since it was built. Codes, canonical
+      units and categories are all derived from the catalogue, so a new version
+      means every stored row was computed under old rules. Rebuilding here is
+      what makes extending the catalogue retrofit the whole history
+      automatically, rather than only for documents filed afterwards.
+    """
+    from sqlalchemy import func, select
+
+    from medvault.catalog.registry import get_catalog
+    from medvault.models import Document, ProjectionState
+
+    state = session.scalars(select(ProjectionState)).first()
+    if state is None or state.last_reindex_at is None:
+        return "the projection has never been built"
+
+    documents = session.scalar(select(func.count()).select_from(Document)) or 0
+    if documents == 0:
+        return "the projection is empty"
+
+    current = get_catalog().version
+    if state.catalog_version != current:
+        return (
+            f"the analyte catalogue moved from version {state.catalog_version} "
+            f"to {current}, so derived values are stale"
+        )
+    return None
 
 
 def cmd_verify(args: argparse.Namespace) -> int:
@@ -261,6 +301,11 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("reindex", help="rebuild the database from the vault")
     p.add_argument("--tenant", help="limit to one tenant")
     p.add_argument("--strict", action="store_true", help="exit non-zero if any document failed")
+    p.add_argument(
+        "--if-needed",
+        action="store_true",
+        help="rebuild only if the projection is empty or the catalogue has changed",
+    )
     p.set_defaults(func=cmd_reindex)
 
     p = sub.add_parser("verify", help="check every original against its recorded digest")

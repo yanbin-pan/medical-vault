@@ -6,9 +6,6 @@
 # decade of medical records on one node's SD card, unbacked-up and lost on a node
 # rebuild. See apps/README.md in home-cluster.
 #
-# There is deliberately no second volume for the database. The projection is a
-# cache that the pod rebuilds from these files on every start, so it lives in an
-# emptyDir — see deployment.yaml.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -22,3 +19,35 @@ spec:
     requests:
       # Photographs of paper reports, a few hundred KB each. 20Gi is years of them.
       storage: 20Gi
+---
+# The projection.
+#
+# Also on `ssd`, and for a different reason than the vault: convenience, not
+# necessity. Everything in here is derived and `medvault reindex` rebuilds it
+# from the vault, so losing it costs a few seconds, not data.
+#
+# It is on the SSD rather than an emptyDir or `local-path` because both of those
+# are the node's root filesystem, which is an SD card on all four nodes —
+# including rpi-01, whose SSD is a data disk rather than a boot device. A
+# database that is rewritten in full on every rebuild does not belong there.
+#
+# Being NFS-backed has one consequence the application handles rather than
+# ignores: SQLite's write-ahead log needs shared memory and cannot work across a
+# network mount, so the API detects the filesystem type at startup and falls
+# back to a rollback journal. See medvault/db.py:choose_journal_mode.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: medical-vault-cache
+  namespace: medical-vault
+spec:
+  accessModes:
+    # One writer, enforced by the single-replica Recreate Deployment. This is
+    # what keeps SQLite-over-NFS safe: the dangerous case is two processes
+    # holding the same file, not one.
+    - ReadWriteOnce
+  resources:
+    requests:
+      # The projection is a few megabytes at realistic scale; tens at absurd
+      # scale. 2Gi is far more than it will ever need.
+      storage: 2Gi

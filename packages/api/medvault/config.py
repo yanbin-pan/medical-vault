@@ -28,13 +28,20 @@ class Settings(BaseSettings):
     # would buy concurrency the deployment cannot use anyway: the vault volume
     # is ReadWriteOnce, so there is exactly one writer by construction.
     #
-    # In the cluster this points at an emptyDir, not at the SSD. Losing it is a
-    # non-event by design: `medvault reindex` rebuilds it from the vault, and
-    # the pod does exactly that on every start. Keeping it off NFS also sidesteps
-    # SQLite's well-known locking problems there.
+    # In the cluster this points at its own SSD-backed volume, so it survives
+    # restarts and an ordinary deploy does not rebuild it. Losing it is still a
+    # non-event: `medvault reindex` rebuilds it from the vault, and the pod does
+    # so automatically when the projection is empty or the catalogue has moved.
+    #
+    # That volume is NFS-backed, which is why sqlite_journal_mode below exists.
     #
     # Any SQLAlchemy URL works. PostgreSQL needs the `postgres` extra installed.
     database_url: str = "sqlite:///./medvault.db"
+
+    # SQLite journal mode. Left unset it is chosen automatically: WAL on a local
+    # disk, DELETE when the database file sits on a network filesystem, where
+    # WAL cannot work at all. Set it explicitly only to override that.
+    sqlite_journal_mode: str | None = None
 
     # --- Extraction ----------------------------------------------------------
     anthropic_api_key: str = ""

@@ -239,3 +239,50 @@ def _snapshot(session: Session) -> list[tuple]:
         )
         for o in session.scalars(select(Observation).order_by(Observation.id)).all()
     ]
+
+
+def test_reindex_if_needed_skips_a_current_projection(vault: Vault, session: Session):
+    """An ordinary deploy must not rebuild: the projection is on its own volume."""
+    from medvault.cli import _reindex_reason
+
+    _seed(vault)
+    assert _reindex_reason(session) == "the projection has never been built"
+
+    reindex(session, vault)
+    assert _reindex_reason(session) is None
+
+
+def test_reindex_if_needed_rebuilds_an_empty_projection(vault: Vault, session: Session):
+    from medvault.cli import _reindex_reason
+    from medvault.models import Document, Observation
+
+    _seed(vault)
+    reindex(session, vault)
+    session.query(Observation).delete()
+    session.query(Document).delete()
+    session.flush()
+
+    assert _reindex_reason(session) == "the projection is empty"
+
+
+def test_a_catalogue_bump_forces_a_rebuild(vault: Vault, session: Session):
+    """The retrofit trigger.
+
+    Codes, canonical units and categories are all derived from the catalogue, so
+    a new version means every stored row was computed under old rules. Noticing
+    that here is what makes extending the catalogue upgrade the whole history on
+    the next deploy, rather than only documents filed afterwards.
+    """
+    from medvault.cli import _reindex_reason
+    from medvault.models import ProjectionState
+
+    _seed(vault)
+    reindex(session, vault)
+    assert _reindex_reason(session) is None
+
+    state = session.get(ProjectionState, 1)
+    state.catalog_version = state.catalog_version - 1
+    session.flush()
+
+    reason = _reindex_reason(session)
+    assert reason is not None and "catalogue moved from version" in reason

@@ -193,8 +193,7 @@ git add k8s/secret.sops.yaml && git commit -m "Add the deployment secret"
 ```
 
 There is one value in it, and no database password: the projection is SQLite in
-an `emptyDir`, rebuilt from the vault on every pod start, so there is nothing to
-authenticate to. To change the key later, edit in place with
+its own volume, so there is nothing to authenticate to. To change the key later, edit in place with
 `sops k8s/secret.sops.yaml`. Full detail in [`docs/operations.md`](docs/operations.md).
 
 Then tag a release so the arm64 image is built, and point the manifests at it.
@@ -210,11 +209,20 @@ Notes that matter on this cluster:
   `CrashLoopBackOff` with `exec format error`, which reads like an app bug.
 - **A nightly CronJob runs `medvault verify`**, because silent bit-rot is the one
   failure a backup does not save you from: the corrupted file gets backed up too.
-- **One pod, one volume.** The projection is SQLite on an `emptyDir` rather than
-  a database server on its own PVC. At this scale — a family's results over
-  decades is tens of thousands of rows — a server process would buy concurrency
-  the ReadWriteOnce vault volume forbids anyway. Keeping it off NFS also avoids
-  the SQLite-over-NFS corruption this cluster warns about.
+- **One pod.** The projection is SQLite rather than a database server. At this
+  scale — a family's results over decades is tens of thousands of rows — a
+  server process would buy concurrency the ReadWriteOnce vault volume forbids
+  anyway.
+- **Both volumes are on `ssd`, never the SD card.** `emptyDir` and `local-path`
+  both land on the node's root filesystem, which is an SD card on all four
+  nodes, and a database rewritten in full on every rebuild does not belong
+  there. Because `ssd` is NFS-backed, the API detects the filesystem type at
+  startup and drops SQLite from a write-ahead log to a rollback journal — WAL
+  needs shared memory and cannot work across a network mount.
+- **Deploys do not rebuild the projection.** The init container runs
+  `medvault reindex --if-needed`, which is a no-op unless the database is empty
+  or the analyte catalogue has changed. That second case is deliberate: a
+  catalogue bump is exactly when every derived code and unit needs recomputing.
 
 Full detail in [`docs/operations.md`](docs/operations.md).
 
