@@ -1,0 +1,17 @@
+# Encryption rules for this repository.
+#
+# The age recipient is the same public key the home-cluster repository uses, so
+# Flux can decrypt these files with the `sops-age` Secret it already holds. A
+# public key is safe to commit — it can only encrypt. The private half lives at
+# ~/.config/sops/age/home-cluster.agekey on the machines that need it, and in
+# the cluster.
+#
+# Without this file `sops --encrypt` fails with "no matching creation rules
+# found" before it encrypts anything, because it has no way to know either the
+# recipient or which fields to encrypt.
+creation_rules:
+  # Kubernetes Secrets: encrypt only data/stringData, so metadata stays readable
+  # and a diff still shows which keys changed. Matches home-cluster's rule.
+  - path_regex: .*\.sops\.ya?ml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1r8ph8yhw6ulpntwa34jn9k9xj6jdkw96afrtuh5wr3pt8cj0d4vq4e286m

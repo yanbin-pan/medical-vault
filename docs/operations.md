@@ -6,28 +6,51 @@ Everything here assumes the `home-cluster` conventions: Flux reconciles from
 ## First deployment
 
 1. **Create the Secret.** The one step that cannot happen in CI, because the age
-   key is deliberately not in any repository. Run it wherever the key lives:
+   private key is deliberately not in any repository. Run it wherever that key
+   lives (`~/.config/sops/age/home-cluster.agekey`).
 
    ```bash
-   ./scripts/make-secret.sh
+   cd medical-vault
+   cp k8s/secret.sops.yaml.example k8s/secret.sops.yaml
+   $EDITOR k8s/secret.sops.yaml
+   ```
+
+   Fill in three values, and delete the instruction comments at the top:
+
+   - `anthropic-api-key` — your `sk-ant-...` key.
+   - `postgres-password` — any long random string. Generate one with
+     `head -c 1024 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9' | cut -c1-40`.
+     Keep it alphanumeric: it is substituted into a connection URL, where a `/`
+     or `@` would change how the URL parses rather than failing outright.
+   - `database-url` — the **same password again**, between `medvault:` and
+     `@postgres`. If these two drift apart PostgreSQL refuses the connection,
+     with an authentication error that looks nothing like its cause.
+
+   Then encrypt it in place and confirm before committing:
+
+   ```bash
+   sops --encrypt --in-place k8s/secret.sops.yaml
+   grep -c 'ENC\[' k8s/secret.sops.yaml     # must be 3 or more
+   grep -q 'sk-ant-' k8s/secret.sops.yaml && echo "STOP: key still readable"
    git add k8s/secret.sops.yaml && git commit -m "Add the deployment secret"
    ```
 
-   Nothing here needs `k8s/kustomization.yaml` to be reachable until this file
-   exists: it is listed as a resource, so `kustomize build` fails outright
-   without it and the Flux Kustomization never goes Ready. That is deliberate —
-   a deployment missing its credentials should not half-start.
+   `.sops.yaml` at the root of this repository supplies the age recipient and
+   restricts encryption to `stringData`, so metadata stays readable and a diff
+   still shows which keys changed. Without that file `sops` fails with
+   "no matching creation rules found" before encrypting anything.
 
-   The script exists to remove two ways of getting this wrong by hand. The
-   database password appears twice — as `postgres-password` and inside
-   `database-url` — and PostgreSQL simply refuses the connection if they drift
-   apart. And a plaintext secret must not survive a failed encryption long
-   enough to be committed, so the script deletes it on any error path.
+   Until this file exists, `kustomize build k8s/` fails outright — it is listed
+   as a resource — and the Flux Kustomization never goes Ready. That is
+   deliberate: a deployment missing its credentials should not half-start.
 
-   **To rotate a value afterwards, edit in place** — `sops k8s/secret.sops.yaml`.
-   Re-running the script would mint a new database password while PostgreSQL
-   still holds the old one in its PVC, and the API would fail to connect with an
-   authentication error that looks nothing like its cause.
+   **To rotate a value afterwards, edit in place** — `sops k8s/secret.sops.yaml`
+   opens the decrypted file in your editor and re-encrypts on save. Do not
+   regenerate the file: that would mint a new database password while PostgreSQL
+   still holds the old one in its PVC.
+
+   `./scripts/make-secret.sh` does the same thing in one command, if you would
+   rather not do it by hand.
 
 2. **Build the image.** Tag a release; the workflow builds `linux/arm64` and
    pushes to GHCR.

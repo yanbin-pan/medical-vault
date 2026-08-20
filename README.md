@@ -185,15 +185,18 @@ in the home-cluster repository.
 One manual step, once, on a machine that has the cluster's age key:
 
 ```bash
-./scripts/make-secret.sh            # prompts for the Anthropic API key
+cp k8s/secret.sops.yaml.example k8s/secret.sops.yaml
+$EDITOR k8s/secret.sops.yaml             # API key, and a password in two places
+sops --encrypt --in-place k8s/secret.sops.yaml
+grep -c 'ENC\[' k8s/secret.sops.yaml     # must be 3 or more before committing
 git add k8s/secret.sops.yaml && git commit -m "Add the deployment secret"
 ```
 
-It generates the database password, writes it to the two places that must
-agree, encrypts the result with SOPS, and refuses to leave an unencrypted file
-behind if anything fails. To change a value later, edit it in place with
-`sops k8s/secret.sops.yaml` — regenerating would hand PostgreSQL a password it
-is not expecting.
+The database password appears twice, as `postgres-password` and inside
+`database-url`, and they must match. `./scripts/make-secret.sh` does the whole
+thing in one command if you prefer. Either way, to change a value later edit it
+in place with `sops k8s/secret.sops.yaml` — regenerating would hand PostgreSQL a
+password it is not expecting. Full detail in [`docs/operations.md`](docs/operations.md).
 
 Then tag a release so the arm64 image is built, and point the manifests at it.
 
